@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # RoamShrimp Daily Workflow - 旅行的阿虾每日执行脚本 (JSON 工具版 + MiniMax LLM + 图片生成)
 # 用法: bash scripts/daily_workflow.sh [日期 YYYY-MM-DD]
 
@@ -200,43 +199,27 @@ echo "  最低价: ${PRICE}元"
 # 5. 获取景点 - JSON 版
 echo "[5/11] 获取热门景点..."
 log_info "步骤5: 获取热门景点"
-ATTRACTION_JSON=$(python3 "$TOOLS_PATH/attractions.py" "$NEXT_CITY" 3 2>&1) || {
-  error_warn "attractions.py 执行失败: $ATTRACTION_JSON"
-  ATTRACTION_JSON='{"attractions": []}'
+ATTRACTION_JSON=$(python3 "$PROJECT_ROOT/scripts/generate_landmarks.py" "$NEXT_CITY" 3 2>&1) || {
+  error_warn "generate_landmarks.py 执行失败: $ATTRACTION_JSON"
+  ATTRACTION_JSON='[]'
 }
 echo "$ATTRACTION_JSON" > "$PROJECT_ROOT/data/output/attractions_${TARGET_DATE}.json"
 
-ATTRACTION_1=$(echo "$ATTRACTION_JSON" | jq -r '.attractions[0].name // empty' 2>/dev/null | tr -d '\r')
-ATTRACTION_2=$(echo "$ATTRACTION_JSON" | jq -r '.attractions[1].name // empty' 2>/dev/null | tr -d '\r')
-ATTRACTION_3=$(echo "$ATTRACTION_JSON" | jq -r '.attractions[2].name // empty' 2>/dev/null | tr -d '\r')
+ATTRACTION_1=$(echo "$ATTRACTION_JSON" | jq -r '.[0].landmark // empty' 2>/dev/null | tr -d '\r')
+ATTRACTION_1_DESC=$(echo "$ATTRACTION_JSON" | jq -r '.[0].desc // empty' 2>/dev/null | tr -d '\r')
+ATTRACTION_2=$(echo "$ATTRACTION_JSON" | jq -r '.[1].landmark // empty' 2>/dev/null | tr -d '\r')
+ATTRACTION_3=$(echo "$ATTRACTION_JSON" | jq -r '.[2].landmark // empty' 2>/dev/null | tr -d '\r')
 
 # 如果景点获取失败，使用默认值
 ATTRACTION_1="${ATTRACTION_1:-${NEXT_CITY}景点}"
+ATTRACTION_1_DESC="${ATTRACTION_1_DESC:-这里风景优美，非常适合打卡拍照。}"
 ATTRACTION_2="${ATTRACTION_2:-周边小店}"
 ATTRACTION_3="${ATTRACTION_3:-路边小摊}"
 echo "  景点1: $ATTRACTION_1"
 echo "  景点2: $ATTRACTION_2"
 echo "  景点3: $ATTRACTION_3"
 
-# 6. 获取打卡点 - JSON 版
-echo "[6/11] 获取打卡点..."
-log_info "步骤6: 获取打卡点"
-PHOTO_SPOTS_JSON=$(python3 "$TOOLS_PATH/photo_spots.py" "$ATTRACTION_1" "$NEXT_CITY" 2>&1) || {
-  error_warn "photo_spots.py 执行失败: $PHOTO_SPOTS_JSON"
-  PHOTO_SPOTS_JSON='{"photo_spots": []}'
-}
-echo "$PHOTO_SPOTS_JSON" > "$PROJECT_ROOT/data/output/photo_spots_${TARGET_DATE}.json"
-
-PHOTO_SPOT_1=$(echo "$PHOTO_SPOTS_JSON" | jq -r '.photo_spots[0].name // empty' 2>/dev/null | tr -d '\r')
-PHOTO_SPOT_2=$(echo "$PHOTO_SPOTS_JSON" | jq -r '.photo_spots[1].name // empty' 2>/dev/null | tr -d '\r')
-
-# 默认值
-PHOTO_SPOT_1="${PHOTO_SPOT_1:-树叶}"
-PHOTO_SPOT_2="${PHOTO_SPOT_2:-路边的石头}"
-echo "  打卡点1: $PHOTO_SPOT_1"
-echo "  打卡点2: $PHOTO_SPOT_2"
-
-# 7. 获取天气 - JSON 版
+# 6. 获取天气 - JSON 版
 echo "[7/11] 获取天气..."
 log_info "步骤7: 获取天气"
 
@@ -276,11 +259,11 @@ if [[ ! -f "$PROMPT_TEMPLATE_FILE" ]]; then
   error_exit "游记提示词模板不存在: $PROMPT_TEMPLATE_FILE"
 fi
 
-export PERSONA STYLE CURRENT_DAY TARGET_DATE WEATHER_DESC TEMP_C CURRENT_CITY NEXT_CITY PRICE ATTRACTION_1 ATTRACTION_2 ATTRACTION_3 PHOTO_SPOT_1 PHOTO_SPOT_2
+export PERSONA STYLE CURRENT_DAY TARGET_DATE WEATHER_DESC TEMP_C CURRENT_CITY NEXT_CITY PRICE ATTRACTION_1 ATTRACTION_2 ATTRACTION_3
 CONTENT_PROMPT=$(python3 -c "
 import os, sys
 text = sys.stdin.read()
-keys = ['PERSONA', 'STYLE', 'CURRENT_DAY', 'TARGET_DATE', 'WEATHER_DESC', 'TEMP_C', 'CURRENT_CITY', 'NEXT_CITY', 'PRICE', 'ATTRACTION_1', 'ATTRACTION_2', 'ATTRACTION_3', 'PHOTO_SPOT_1', 'PHOTO_SPOT_2']
+keys = ['PERSONA', 'STYLE', 'CURRENT_DAY', 'TARGET_DATE', 'WEATHER_DESC', 'TEMP_C', 'CURRENT_CITY', 'NEXT_CITY', 'PRICE', 'ATTRACTION_1', 'ATTRACTION_2', 'ATTRACTION_3']
 for k in keys:
     text = text.replace('{{' + k + '}}', os.environ.get(k, ''))
 print(text)
@@ -384,10 +367,9 @@ if [[ ! -f "$IMAGE_PROMPT_TEMPLATE_FILE" ]]; then
 fi
 
 # 处理变量默认值
-PHOTO_SPOT_1_VAL="${PHOTO_SPOT_1:-${ATTRACTION_1}}"
 WEATHER_DESC_VAL="${WEATHER_DESC:-afternoon}"
 
-export IMAGE_STYLE_CONTENT NEXT_CITY ATTRACTION_1 PHOTO_SPOT_1_VAL WEATHER_DESC_VAL
+export IMAGE_STYLE_CONTENT NEXT_CITY ATTRACTION_1 ATTRACTION_1_DESC WEATHER_DESC_VAL
 IMAGE_PROMPT_PROMPT=$(python3 -c "
 import os, sys
 text = sys.stdin.read()
@@ -395,7 +377,7 @@ keys = {
     'IMAGE_STYLE_CONTENT': os.environ.get('IMAGE_STYLE_CONTENT', ''),
     'NEXT_CITY': os.environ.get('NEXT_CITY', ''),
     'ATTRACTION_1': os.environ.get('ATTRACTION_1', ''),
-    'PHOTO_SPOT_1': os.environ.get('PHOTO_SPOT_1_VAL', ''),
+    'ATTRACTION_1_DESC': os.environ.get('ATTRACTION_1_DESC', ''),
     'WEATHER_DESC': os.environ.get('WEATHER_DESC_VAL', '')
 }
 for k, v in keys.items():
@@ -464,7 +446,7 @@ fi
 # 如果 LLM 生成失败或未配置，则回退到硬编码拼接
 if [[ -z "$IMAGE_PROMPT" ]]; then
   log_info "LLM 生成图片提示词失败，使用默认拼接模板"
-  IMAGE_PROMPT="A light-red crayfish wearing a small straw hat and a tiny backpack, ${PHOTO_SPOT_1:-${ATTRACTION_1}} near ${ATTRACTION_1} in ${NEXT_CITY}. Japanese picture book illustration style, watercolor, low saturation, soft pastel colors, flat design, minimal composition, lots of white space, hand-drawn texture, paper grain, gentle ${WEATHER_DESC:-afternoon} light, cute and serene atmosphere."
+  IMAGE_PROMPT="A light-red crayfish wearing a small straw hat and a tiny backpack, enjoying the scenery of ${ATTRACTION_1} in ${NEXT_CITY}. ${ATTRACTION_1_DESC} Japanese picture book illustration style, watercolor, low saturation, soft pastel colors, flat design, minimal composition, lots of white space, hand-drawn texture, paper grain, gentle ${WEATHER_DESC:-afternoon} light, cute and serene atmosphere."
 fi
 
 # 清理可能的Markdown代码块标记、换行符和多余空格
