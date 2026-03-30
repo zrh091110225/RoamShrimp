@@ -1,7 +1,7 @@
 {
-  "current_day": 0,
-  "current_city": "未知",
-  "current_wallet": 10000,
+  "current_day": 1,
+  "current_city": "深圳",
+  "current_wallet": 1000,
   "last_updated": "2026-03-30",
   "status": "ready"
 }
