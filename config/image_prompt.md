@@ -2,20 +2,20 @@
 请仔细阅读以下【图片风格配置】，并根据提供的【当前场景变量】，为 AI 绘画工具生成一段中文的提示词（Prompt）。
 
 【图片风格配置】：
-{{IMAGE\_STYLE\_CONTENT}}
+{{IMAGE_STYLE_CONTENT}}
 
 【当前场景变量】：
 
-- 城市 (NEXT\_CITY)：{{NEXT\_CITY}}
-- 景点 (ATTRACTION\_1)：{{ATTRACTION\_1}}
-- 打卡点 (PHOTO\_SPOT\_1)：{{PHOTO\_SPOT\_1}}
-- 天气 (WEATHER\_DESC)：{{WEATHER\_DESC}}
+- 城市 (NEXT_CITY)：{{NEXT_CITY}}
+- 景点 (ATTRACTION_1)：{{ATTRACTION_1}}
+- 打卡点 (PHOTO_SPOT_1)：{{PHOTO_SPOT_1}}
+- 天气 (WEATHER_DESC)：{{WEATHER_DESC}}
 
 【输出要求】：
 
 1. 必须使用**中文**输出。
 2. 必须包含【图片风格配置】中定义的主角信息: 一直淡红色的下龙虾，戴着一顶小小的草帽，性格随性、好奇、喜欢安静。
 3. 必须包含所有【风格关键词】描述（如：日系水彩风格，旅行的青蛙审美，绘本插画，柔和低饱和度色彩，细铅笔线条手绘，极简构图，纸张质感，禅意氛围，2D，扁平设计）。
-4. 将【当前场景变量】融入到画面描述中，增加景点(ATTRACTION\_1)特征描述信息。主角在打卡点 (PHOTO\_SPOT\_1) 拍照的位置描述清楚，参考场景变量天气 (WEATHER\_DESC)。
+4. 将【当前场景变量】融入到画面描述中，增加景点(ATTRACTION_1)特征描述信息。主角在打卡点 (PHOTO_SPOT_1) 拍照的位置描述清楚，参考场景变量天气 (WEATHER_DESC)。
 5. **只输出中文提示词正文**，不要包含任何其他解释性文字、代码块或前缀（例如不要说 'Here is the prompt:'）。
 
