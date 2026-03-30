@@ -468,8 +468,8 @@ if [[ -z "$IMAGE_PROMPT" ]]; then
   IMAGE_PROMPT="A light-red crayfish wearing a small straw hat and a tiny backpack, ${PHOTO_SPOT_1:-${ATTRACTION_1}} near ${ATTRACTION_1} in ${NEXT_CITY}. Japanese picture book illustration style, watercolor, low saturation, soft pastel colors, flat design, minimal composition, lots of white space, hand-drawn texture, paper grain, gentle ${WEATHER_DESC:-afternoon} light, cute and serene atmosphere."
 fi
 
-# 清理可能的换行符和多余空格
-IMAGE_PROMPT=$(echo "$IMAGE_PROMPT" | tr -d '\n' | sed 's/^ *//;s/ *$//')
+# 清理可能的Markdown代码块标记、换行符和多余空格
+IMAGE_PROMPT=$(echo "$IMAGE_PROMPT" | sed 's/```[a-zA-Z]*//g' | sed 's/```//g' | tr -d '\n' | sed 's/^ *//;s/ *$//')
 
 echo "$IMAGE_PROMPT" > "$PROJECT_ROOT/data/output/image_prompt_${TARGET_DATE}.txt"
 echo "  提示词: $IMAGE_PROMPT"
@@ -609,11 +609,12 @@ if [[ -f "$INDEX_FILE" ]]; then
   if ! grep -q "\](./${TARGET_DATE}-${NEXT_CITY}.md)" "$INDEX_FILE" 2>/dev/null; then
     # 在分隔线后面插入新行
     awk -v date="$TARGET_DATE" -v city="$NEXT_CITY" -v price="${PRICE}元" -v wallet="${NEW_WALLET}元" -v file="${TARGET_DATE}-${NEXT_CITY}.md" '
-      /^---$/ {
+      /^\| -/ {
         print
         print "| " date " | " city " | " price " | " wallet " | [查看](./" file ") |"
         next
       }
+      /\| <br \/>/ { next }
       { print }
     ' "$INDEX_FILE" > "${INDEX_FILE}.tmp" 2>/dev/null && mv "${INDEX_FILE}.tmp" "$INDEX_FILE"
     
