@@ -117,16 +117,15 @@ fi
 
 # 环境变量显式校验，缺失即退出
 : "${LLM_API_KEY:?未配置 LLM_API_KEY，请在 .env 中设置}"
-: "${DASHSCOPE_API_KEY:?未配置 DASHSCOPE_API_KEY，请在 .env 中设置}"
 
 # LLM 配置（默认值）
 LLM_PROVIDER="${LLM_PROVIDER:-minimax}"
 LLM_BASE_URL="${LLM_BASE_URL:-https://api.minimax.chat/v1}"
 WRITER_MODEL="${WRITER_MODEL:-MiniMax-Text-01}"
 
-# 图片生成配置（通义万相）
-IMAGE_PROVIDER="${IMAGE_PROVIDER:-dashscope}"
-IMAGE_MODEL="${IMAGE_MODEL:-qwen-image-2.0-pro}"
+# 图片生成配置（支持通过环境变量动态配置）
+IMAGE_PROVIDER="${IMAGE_PROVIDER:-google}"
+IMAGE_MODEL="${IMAGE_MODEL:-imagen-3.0-generate-002}"
 
 echo "=========================================="
 echo "RoamShrimp Daily Workflow: $TARGET_DATE"
@@ -486,22 +485,29 @@ if ! command -v bun &>/dev/null; then
   echo "  ⚠️ bun 未安装，跳过图片生成"
   log_info "bun 未安装，跳过图片生成"
 else
-  # 检查 DASHSCOPE_API_KEY
-  if [[ -z "$DASHSCOPE_API_KEY" ]]; then
-    echo "  ⚠️ 未配置 DASHSCOPE_API_KEY，跳过图片生成"
-    log_info "未配置 DASHSCOPE_API_KEY，跳过图片生成"
-  else
+  # 检查对应的 API_KEY
+  # 如果 provider 是 google，检查 GEMINI_API_KEY；如果是 dashscope，检查 DASHSCOPE_API_KEY
+  HAS_IMAGE_API_KEY="false"
+  if [[ "$IMAGE_PROVIDER" == "google" && -n "$GEMINI_API_KEY" ]]; then
+    export GEMINI_API_KEY
+    HAS_IMAGE_API_KEY="true"
+  elif [[ "$IMAGE_PROVIDER" == "dashscope" && -n "$DASHSCOPE_API_KEY" ]]; then
     export DASHSCOPE_API_KEY
-    
+    HAS_IMAGE_API_KEY="true"
+  fi
+
+  if [[ "$HAS_IMAGE_API_KEY" == "false" ]]; then
+    echo "  ⚠️ 未配置 ${IMAGE_PROVIDER} 对应的 API_KEY，跳过图片生成"
+    log_info "未配置 ${IMAGE_PROVIDER} 对应的 API_KEY，跳过图片生成"
+  else
     # 尝试生成图片
-    log_info "调用图片生成服务..."
+    log_info "调用图片生成服务 ($IMAGE_PROVIDER, Model: $IMAGE_MODEL)..."
     if bun "$BAOYU_IMAGE_GEN" \
-      --provider dashscope \
-      --model qwen-image-2.0-pro \
+      --provider "$IMAGE_PROVIDER" \
+      --model "$IMAGE_MODEL" \
       --prompt "$IMAGE_PROMPT_FOR_GEN" \
       --image "$IMAGE_OUTPUT" \
       --ar 1:1 \
-      --size 720x720 \
       --json 2>&1 | tee "$PROJECT_ROOT/data/output/image_gen_${TARGET_DATE}.log"; then
       echo "  ✅ 图片已生成: $IMAGE_OUTPUT"
       log_info "图片生成成功: $IMAGE_OUTPUT"
@@ -518,24 +524,9 @@ else
         fi
       fi
     else
-      # 图片生成失败，尝试备用方案
-      error_warn "图片生成失败，尝试备用尺寸..."
-      log_info "图片生成失败，尝试备用尺寸 1024x1024..."
-      
-      if bun "$BAOYU_IMAGE_GEN" \
-        --provider dashscope \
-        --model qwen-image-2.0-pro \
-        --prompt "$IMAGE_PROMPT_FOR_GEN" \
-        --image "$IMAGE_OUTPUT" \
-        --ar 1:1 \
-        --size 1024x1024 \
-        --json 2>&1 | tee -a "$PROJECT_ROOT/data/output/image_gen_${TARGET_DATE}.log"; then
-        echo "  ✅ 图片已生成(备用): $IMAGE_OUTPUT"
-        log_info "图片生成成功(备用): $IMAGE_OUTPUT"
-      else
-        error_warn "图片生成最终失败，跳过图片"
-        log_info "图片生成最终失败"
-      fi
+      # 图片生成失败，如果不是使用备用方案的调用且配置允许，可扩展尝试备用方案逻辑
+      error_warn "图片生成最终失败，跳过图片"
+      log_info "图片生成最终失败"
     fi
   fi
 fi

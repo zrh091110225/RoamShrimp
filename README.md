@@ -7,7 +7,7 @@
 | 指标   | 值       |
 | ---- | ------- |
 | Day  | 0       |
-| 当前城市 | 信丰 |
+| 当前城市 | 吉安 |
 | 余额   | 10000 元 |
 | 状态   | ⚪ 未开始   |
 
@@ -123,8 +123,11 @@ cp .env.example .env
 ```bash
 MINIMAX_API_KEY=your_key        # MiniMax LLM
 MINIMAX_BASE_URL=https://api.minimax.chat/v1
-DASHSCOPE_API_KEY=your_key     # 通义万相图片生成
-# TINYPNG_API_KEY=your_key     # 可选：图片压缩
+# IMAGE_PROVIDER=google         # 可选: 图片生成服务商，默认 google
+# IMAGE_MODEL=imagen-3.0-generate-002 # 可选: 图片生成模型，默认 imagen-3.0-generate-002
+GEMINI_API_KEY=your_key         # Google Gemini 图片生成 (如果用 google)
+# DASHSCOPE_API_KEY=your_key    # 通义万相图片生成 (如果用 dashscope)
+# TINYPNG_API_KEY=your_key      # 可选：图片压缩
 ```
 
 ***
