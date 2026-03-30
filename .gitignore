@@ -1,0 +1,13 @@
+# 运行时数据（不提交）
+data/output/
+data/logs/
+
+# 环境配置（不提交）
+.env
+.env.*
+.env.local
+.env.development
+.env.test
+
+# 图片压缩缓存
+.tinypng_cache/
