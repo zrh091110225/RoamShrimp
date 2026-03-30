@@ -106,9 +106,8 @@
 
 使用 `baoyu-image-gen` 脚本生成：
 
-- Provider: dashscope
-- Model: qwen-image-2.0-pro
-- 建议尺寸: 720x720 或 1024x1024
+- Provider: google
+- Model: gemini-3.1-flash-image-preview
 - 比例: 1:1 正方形
 
 <br />

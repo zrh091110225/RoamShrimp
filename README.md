@@ -7,7 +7,7 @@
 | 指标   | 值       |
 | ---- | ------- |
 | Day  | 0       |
-| 当前城市 | 吉安 |
+| 当前城市 | 宜丰 |
 | 余额   | 10000 元 |
 | 状态   | ⚪ 未开始   |
 
@@ -124,7 +124,7 @@ cp .env.example .env
 MINIMAX_API_KEY=your_key        # MiniMax LLM
 MINIMAX_BASE_URL=https://api.minimax.chat/v1
 # IMAGE_PROVIDER=google         # 可选: 图片生成服务商，默认 google
-# IMAGE_MODEL=imagen-3.0-generate-002 # 可选: 图片生成模型，默认 imagen-3.0-generate-002
+# IMAGE_MODEL=gemini-3.1-flash-image-preview # 可选: 图片生成模型，默认 gemini-3.1-flash-image-preview
 GEMINI_API_KEY=your_key         # Google Gemini 图片生成 (如果用 google)
 # DASHSCOPE_API_KEY=your_key    # 通义万相图片生成 (如果用 dashscope)
 # TINYPNG_API_KEY=your_key      # 可选：图片压缩

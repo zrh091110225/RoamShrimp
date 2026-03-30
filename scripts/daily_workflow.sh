@@ -125,7 +125,7 @@ WRITER_MODEL="${WRITER_MODEL:-MiniMax-Text-01}"
 
 # 图片生成配置（支持通过环境变量动态配置）
 IMAGE_PROVIDER="${IMAGE_PROVIDER:-google}"
-IMAGE_MODEL="${IMAGE_MODEL:-imagen-3.0-generate-002}"
+IMAGE_MODEL="${IMAGE_MODEL:-gemini-3.1-flash-image-preview}"
 
 echo "=========================================="
 echo "RoamShrimp Daily Workflow: $TARGET_DATE"
