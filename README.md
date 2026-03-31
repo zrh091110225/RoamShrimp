@@ -42,7 +42,6 @@
   <img src="./data/demo/哈尔滨.jpg" width="30%" />
   <img src="./data/demo/湖南.jpg" width="30%" />
   <img src="./data/demo/昆明.jpg" width="30%" />
-  <img src="./data/demo/拉萨.jpg" width="30%" />
   <img src="./data/demo/满洲里.jpg" width="30%" />
   <img src="./data/demo/南京.jpg" width="30%" />
   <img src="./data/demo/三亚.jpg" width="30%" />

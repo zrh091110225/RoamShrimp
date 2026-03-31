@@ -18,11 +18,29 @@ echo "=========================================="
 echo "正在清理 images 目录..."
 rm -rf "$DATA_DIR/images"/*
 
+INDEX_FILE="$DATA_DIR/journals/index.md"
+INDEX_INTRO="阿虾的环游中国旅行记录。"
+if [[ -f "$INDEX_FILE" ]]; then
+  EXISTING_INTRO=$(awk '
+    BEGIN { capture=0 }
+    /^# 每日游记索引$/ { capture=1; next }
+    capture && /^## / { exit }
+    capture {
+      if (started == 0 && $0 == "") next
+      started = 1
+      print
+    }
+  ' "$INDEX_FILE")
+  if [[ -n "${EXISTING_INTRO//$'\n'/}" ]]; then
+    INDEX_INTRO="$EXISTING_INTRO"
+  fi
+fi
+
 echo "正在清理 journals 目录..."
 rm -rf "$DATA_DIR/journals"/*
 
 # 重新创建 index.md，保持状态区和表头
-ensure_journal_index "$PROJECT_ROOT" "0" "未知" "10000" "⚪ 未开始" "$(date +%Y-%m-%d)"
+ensure_journal_index "$PROJECT_ROOT" "0" "未知" "10000" "⚪ 未开始" "$(date +%Y-%m-%d)" "$INDEX_INTRO"
 echo "✅ images 和 journals 目录下的文件已删除，并重建了 journals/index.md"
 
 # 2. 清空 route.md

@@ -1,8 +1,7 @@
 {
-  "current_day": 18,
-  "current_city": "盘山",
-  "current_wallet": 17.5,
+  "current_day": 0,
+  "current_city": "未知",
+  "current_wallet": 10000,
   "last_updated": "2026-03-31",
-  "status": "traveling",
-  "last_star_count": 1
+  "status": "ready"
 }

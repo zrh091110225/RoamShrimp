@@ -35,6 +35,7 @@ ensure_journal_index() {
   local wallet="$4"
   local status_label="$5"
   local last_updated="$6"
+  local intro_text="${7:-阿虾的环游中国旅行记录。}"
   local index_file="$project_root/data/journals/index.md"
 
   mkdir -p "$(dirname "$index_file")"
@@ -45,7 +46,7 @@ ensure_journal_index() {
   cat > "$index_file" <<EOF
 # 每日游记索引
 
-阿虾的环游中国旅行记录。
+${intro_text}
 
 ## 当前状态
 
@@ -63,7 +64,7 @@ ensure_journal_index() {
 
 ***
 
-_最后更新: $last_updated_
+_最后更新: ${last_updated}_
 EOF
 }
 
