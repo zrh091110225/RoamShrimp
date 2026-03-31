@@ -167,7 +167,35 @@ if [[ ! -f "$ROUTE_FILE" ]]; then
   error_exit "路径文件不存在: $ROUTE_FILE"
 fi
 
-NEXT_CITY=$(grep -v '^#' "$ROUTE_FILE" | grep -v '^$' | tail -n +2 | head -1 | tr -d '\r')
+ROUTE_CITIES=()
+while IFS= read -r route_city; do
+  ROUTE_CITIES+=("$route_city")
+done < <(grep -v '^#' "$ROUTE_FILE" | sed '/^[[:space:]]*$/d' | tr -d '\r')
+
+if [[ ${#ROUTE_CITIES[@]} -eq 0 ]]; then
+  error_exit "路径文件中没有可用的城市节点: $ROUTE_FILE"
+fi
+
+CURRENT_INDEX=-1
+for i in "${!ROUTE_CITIES[@]}"; do
+  if [[ "${ROUTE_CITIES[$i]}" == "$CURRENT_CITY" ]]; then
+    CURRENT_INDEX=$i
+    break
+  fi
+done
+
+if (( CURRENT_INDEX >= 0 )); then
+  NEXT_INDEX=$((CURRENT_INDEX + 1))
+  if (( NEXT_INDEX < ${#ROUTE_CITIES[@]} )); then
+    NEXT_CITY="${ROUTE_CITIES[$NEXT_INDEX]}"
+  else
+    NEXT_CITY=""
+  fi
+else
+  NEXT_CITY="${ROUTE_CITIES[0]}"
+  error_warn "当前城市 $CURRENT_CITY 不在 route.md 中，回退为从首个城市节点继续: $NEXT_CITY"
+fi
+
 if [[ -z "$NEXT_CITY" ]]; then
   echo "  ⚠️ 已到达终点城市，旅行结束"
   log_info "已到达终点城市，旅行结束"
@@ -540,10 +568,22 @@ echo "  新状态: Day $NEW_DAY, $NEXT_CITY, 余额 $NEW_WALLET 元"
 # 更新 route.md（移除第一行）
 echo "  更新路径..."
 log_info "更新路线文件..."
-if grep -v '^#' "$ROUTE_FILE" | grep -v '^$' | tail -n +2 > "${ROUTE_FILE}.tmp" 2>/dev/null; then
+NEXT_ROUTE_START=-1
+for i in "${!ROUTE_CITIES[@]}"; do
+  if [[ "${ROUTE_CITIES[$i]}" == "$NEXT_CITY" ]]; then
+    NEXT_ROUTE_START=$i
+    break
+  fi
+done
+
+if (( NEXT_ROUTE_START >= 0 )); then
+  : > "${ROUTE_FILE}.tmp"
+  for ((i = NEXT_ROUTE_START; i < ${#ROUTE_CITIES[@]}; i++)); do
+    printf '%s\n' "${ROUTE_CITIES[$i]}" >> "${ROUTE_FILE}.tmp"
+  done
   mv "${ROUTE_FILE}.tmp" "$ROUTE_FILE"
 else
-  error_warn "路线文件更新失败"
+  error_warn "路线文件更新失败：未找到新的当前城市 $NEXT_CITY"
 fi
 
 # 更新 status.json
