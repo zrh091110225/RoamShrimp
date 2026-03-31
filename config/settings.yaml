@@ -19,7 +19,7 @@ star_reward_n=10
 
 # 外部工具路径
 tools_path="${HOME}/.openclaw/workspace/tools"
-city_map_file="${tools_path}/city_map.json"
+city_map_file="./config/city_map.json"
 image_gen_script="${HOME}/.openclaw/workspace/skills/baoyu-skills/skills/baoyu-image-gen/scripts/main.ts"
 
 # 默认模型配置

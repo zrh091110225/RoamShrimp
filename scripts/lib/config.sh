@@ -5,7 +5,7 @@ load_runtime_config() {
   local settings_file="$project_root/config/settings.yaml"
 
   tools_path="${tools_path:-$HOME/.openclaw/workspace/tools}"
-  city_map_file="${city_map_file:-$tools_path/city_map.json}"
+  city_map_file="${city_map_file:-$project_root/config/city_map.json}"
   image_gen_script="${image_gen_script:-$HOME/.openclaw/workspace/skills/baoyu-skills/skills/baoyu-image-gen/scripts/main.ts}"
 
   llm_provider_default="${llm_provider_default:-minimax}"
@@ -21,5 +21,9 @@ load_runtime_config() {
     # shellcheck disable=SC1090
     source "$settings_file"
     set +a
+  fi
+
+  if [[ "$city_map_file" == ./* ]]; then
+    city_map_file="$project_root/${city_map_file#./}"
   fi
 }

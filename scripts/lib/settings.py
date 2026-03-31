@@ -8,7 +8,7 @@ from pathlib import Path
 
 DEFAULTS = {
     "tools_path": "${HOME}/.openclaw/workspace/tools",
-    "city_map_file": "${HOME}/.openclaw/workspace/tools/city_map.json",
+    "city_map_file": "./config/city_map.json",
     "image_gen_script": "${HOME}/.openclaw/workspace/skills/baoyu-skills/skills/baoyu-image-gen/scripts/main.ts",
     "llm_provider_default": "minimax",
     "llm_base_url_default": "https://api.minimax.chat/v1",
@@ -47,5 +47,9 @@ def load_runtime_settings(project_root: str | Path) -> dict[str, str]:
             if resolved != expanded[key]:
                 expanded[key] = resolved
                 changed = True
+
+    city_map_value = expanded.get("city_map_file")
+    if city_map_value and city_map_value.startswith("./"):
+        expanded["city_map_file"] = str(project_root / city_map_value[2:])
 
     return expanded
