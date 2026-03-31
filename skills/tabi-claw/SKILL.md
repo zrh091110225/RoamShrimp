@@ -1,194 +1,266 @@
 ---
 name: "tabi-claw"
-description: "旅行的阿虾：模拟旅行青蛙，每天自动生成游记内容。包含初始化配置、单次执行Workflow、工具脚本调用。当用户提到旅行的阿虾、TabiClaw、阿虾游记、自动生成游记时使用。"
+description: "旅行的阿虾：一个持续运行的 AI 旅行仓库。按路线推进城市、生成游记与配图、维护状态和索引，并可自动提交 Git。当用户提到 TabiClaw、旅行的阿虾、阿虾游记、继续旅行、查看状态、重规划路线时使用。"
 ---
 
 # TabiClaw / 旅行的阿虾
 
-模拟旅行青蛙的自动内容生成系统：设定初始金额和城市路径，每天自动生成一篇游记并发布到 GitHub。
+TabiClaw 不是一次性内容生成器，而是一个每天推进一天的旅行工作流项目。
+
+阿虾会沿着 `data/route.md` 中的路线前进。每次执行每日工作流时，项目会：
+
+- 读取当前状态
+- 计算下一站
+- 查询路线价格、景点、天气
+- 生成一篇游记
+- 生成一张配图
+- 更新 `status.json`
+- 更新 `data/journals/index.md` 顶部的当前状态面板和游记列表
+- 记录 Git 提交
 
 ## When to use this skill
 
-- 用户提到"旅行的阿虾"、"TabiClaw"、"阿虾"、"生成游记"、"开始今天的旅行"
-- 需要初始化项目配置时
-- 需要执行单次旅行 Workflow 时
-- 需要检查余额或旅行状态时
+- 用户提到“旅行的阿虾”、“TabiClaw”、“阿虾”
+- 用户想“生成今天的游记”、“让阿虾继续旅行”
+- 用户想查看当前状态、余额、当前城市、路线
+- 用户想重新规划路线或从当前终点继续追加路线
+- 用户想初始化、清理、重置这个项目
 
-## 项目结构
+## 当前项目结构
 
-```
+```text
 TabiClaw/
-├── config/                    # 配置文件目录
-│   ├── persona.md           # 人设配置
-│   ├── style.md             # 文风配置
+├── README.md
+├── README.en.md
+├── config/
+│   ├── city_map.json        # 城市中英文映射，已移入项目
+│   ├── image_prompt.md      # 图片提示词模板
 │   ├── image_style.md       # 图片风格配置
-│   └── settings.yaml        # 基本配置（钱包金额等）
-├── data/                     # 运行时数据
-│   ├── route.md             # 城市路径列表
-│   ├── status.json          # 当前状态（Day/城市/余额）
-│   ├── journals/            # 每日游记
-│   └── output/              # 工具输出（JSON）
-├── tools/                    # 工具脚本（从外部调用）
-│   └── （位于 /Users/hymanhai/.openclaw/workspace/tools/）
-│       ├── route.py         # 路线查询（JSON输出，最低公交价）
-│       ├── attractions.py   # 景点查询（JSON输出）
-│       ├── photo_spots.py   # 打卡点查询（JSON输出）
-│       ├── weather.py       # 天气查询（JSON输出）
-│       ├── route_planner.py # 路径规划（JSON输出）
-│       └── city_map.json    # 中英文城市映射
-└── scripts/                  # Workflow 执行脚本
-    ├── init.sh              # 初始化检查
-    └── daily_workflow.sh    # 单次执行（LLM + 图片）
+│   ├── journal_prompt.md    # 游记提示词模板
+│   ├── persona.md           # 人设
+│   ├── settings.yaml        # 路径 / 模型 / Git 行为等配置
+│   └── style.md             # 文风配置
+├── data/
+│   ├── images/              # 生成图片
+│   ├── journals/
+│   │   ├── index.md         # 当前状态面板 + 游记索引入口
+│   │   └── YYYY-MM-DD-城市.md
+│   ├── logs/
+│   ├── output/              # 中间产物、prompt、JSON输出
+│   ├── route.md             # 剩余路线
+│   └── status.json          # 当前状态
+├── docs/
+├── scripts/
+│   ├── auto_commit.sh
+│   ├── check_stars.py
+│   ├── clean_data.sh
+│   ├── continue_route.sh
+│   ├── daily_workflow.sh
+│   ├── generate_images.sh
+│   ├── generate_landmarks.py
+│   ├── init.sh
+│   ├── replan_route.sh
+│   └── lib/
+│       ├── config.sh
+│       ├── settings.py
+│       └── template_renderer.py
+└── skills/
+    └── tabi-claw/
 ```
 
-## 工具脚本 JSON 输出格式
+## 状态与索引约定
 
-所有工具脚本已改造为 JSON 输出：
+当前状态以两个文件为准：
 
-### route.py
-```json
-{
-  "success": true,
-  "tool": "route",
-  "city_from": "杭州",
-  "city_to": "南京",
-  "transit_routes": [
-    {"type": "transit", "duration_min": 69, "price_yuan": 141, "distance_km": 0},
-    {"type": "transit", "duration_min": 64, "price_yuan": 128, "distance_km": 0}
-  ],
-  "best_price": 128,
-  "best_route": {"type": "transit", "duration_min": 64, "price_yuan": 128}
-}
-```
+- `data/status.json`：机器可读的运行状态
+- `data/journals/index.md`：人可读入口，顶部包含“当前状态”面板，下面是游记列表
 
-### attractions.py
-```json
-{
-  "success": true,
-  "tool": "attractions",
-  "city": "南京",
-  "attractions": [
-    {"name": "中山陵景区", "address": "南京市玄武区...", "tag": "景点", "rating": ""}
-  ]
-}
-```
+README 不再维护顶部状态表。查看“阿虾现在到哪了”，优先读：
 
-### photo_spots.py
-```json
-{
-  "success": true,
-  "tool": "photo_spots",
-  "spot_name": "中山陵景区",
-  "photo_spots": [
-    {"name": "头陀岭景区-观景台", "address": ""}
-  ]
-}
-```
+1. `data/journals/index.md`
+2. `data/status.json`
 
-### weather.py
-```json
-{
-  "success": true,
-  "tool": "weather",
-  "city_cn": "南京",
-  "city_en": "Nanjing",
-  "temp_c": "19",
-  "weather_desc": "Overcast",
-  "temp_range": "12-16"
-}
-```
+## 核心脚本
 
-## 核心 Workflow
+### 1. 初始化检查
 
-### 1. 初始化检查 (init)
 ```bash
 bash scripts/init.sh
 ```
 
-### 2. 单次执行 Workflow (daily_run)
-```bash
-# 手动执行
-bash scripts/daily_workflow.sh
+用途：
 
-# 指定日期
-bash scripts/daily_workflow.sh 2026-03-30
+- 检查配置文件是否完整
+- 检查运行时数据是否存在
+- 检查外部工具路径是否可用
+- 必要时初始化 `status.json`
+
+### 2. 执行一次每日工作流
+
+```bash
+bash scripts/daily_workflow.sh
+bash scripts/daily_workflow.sh 2026-03-31
 ```
 
-### 3. LLM 生成内容
-使用 MiniMax 生成游记内容，支持：
-- 人设风格保持
-- 景点描述
-- 心境总结
+这是项目最核心的入口。它会推进一天旅行，并更新：
 
-### 4. 图片提示词生成
-基于打卡点和天气生成 AI 图片提示词，风格：
-- 日系水彩
-- 低饱和度
-- 绘本感
+- `data/status.json`
+- `data/route.md`
+- `data/journals/index.md`
+- `data/journals/*.md`
+- `data/images/*.png`
+- `data/output/*`
+- Git 提交记录
 
-## 环境变量要求
-
-项目使用 `.env` 文件管理密钥。请复制 `.env.example` 到根目录的 `.env` 中并填写真实密钥。
+### 3. 重新规划完整路线
 
 ```bash
-# MiniMax LLM（必需）
-MINIMAX_API_KEY=your_key_here
-LLM_PROVIDER=minimax
-MINIMAX_BASE_URL=https://api.minimax.chat/v1
-WRITER_MODEL=MiniMax-M2.5
+bash scripts/replan_route.sh 杭州 北京
+bash scripts/replan_route.sh 杭州 北京 --reset
+```
 
-# 图片生成（可选）
-DASHSCOPE_API_KEY=your_key_here
+作用：
+
+- 重写 `data/route.md`
+- 使用 `--reset` 时重置 `status.json`
+- 同步更新 `data/journals/index.md` 顶部状态
+
+### 4. 从当前终点继续追加路线
+
+```bash
+bash scripts/continue_route.sh 广州
+```
+
+作用：
+
+- 从 `data/route.md` 的最后一个城市继续规划
+- 将新增路线追加到现有 `route.md`
+
+### 5. 清空运行数据
+
+```bash
+bash scripts/clean_data.sh
+```
+
+作用：
+
+- 清空图片和单篇游记
+- 重建 `data/journals/index.md`
+- 保留索引顶部说明文字
+- 重置 `status.json`
+- 清空 `route.md`
+
+## 配置规则
+
+项目当前把以下运行参数收敛到 `config/settings.yaml`：
+
+- `tools_path`
+- `city_map_file`
+- `image_gen_script`
+- `llm_provider_default`
+- `llm_base_url_default`
+- `writer_model_default`
+- `image_provider_default`
+- `image_model_default`
+- `git_auto_push`
+
+其中：
+
+- `city_map.json` 已经移入项目内，默认指向 `./config/city_map.json`
+- `git_auto_push=false` 时，自动提交后只 `commit`，不 `push`
+
+## 外部依赖
+
+项目仍依赖外部工具目录 `tools_path` 下的脚本：
+
+- `route.py`
+- `attractions.py`
+- `photo_spots.py`
+- `weather.py`
+- `route_planner.py`
+
+但 `city_map.json` 已不再依赖外部目录，已经内置在项目的 `config/` 中。
+
+## 环境变量
+
+至少需要：
+
+```bash
+LLM_PROVIDER=minimax
+LLM_API_KEY=your_key
+LLM_BASE_URL=https://api.minimax.chat/v1
+WRITER_MODEL=MiniMax-Text-01
+```
+
+图片生成常见变量：
+
+```bash
+IMAGE_PROVIDER=google
+IMAGE_MODEL=gemini-3.1-flash-image-preview
+GEMINI_API_KEY=your_key
+```
+
+或：
+
+```bash
 IMAGE_PROVIDER=dashscope
 IMAGE_MODEL=qwen-image-2.0-pro
-
-# 路径
-TABICLAW_ROOT=/Users/hymanhai/TabiClaw
-TOOLS_PATH=/Users/hymanhai/.openclaw/workspace/tools
+DASHSCOPE_API_KEY=your_key
 ```
 
-## 使用示例
+可选：
 
-**初始化项目**:
-```
-用户: 帮我初始化旅行的阿虾
-助手: 调用 init.sh，检查配置，引导用户补充
+```bash
+TINYPNG_API_KEY=your_key
 ```
 
-**生成今日游记**:
-```
-用户: 今天阿虾的游记
-助手: 调用 daily_workflow.sh，执行完整流程
-```
+## 用户请求到操作的映射
 
-**检查状态**:
-```
-用户: 阿虾现在到哪了
-助手: 读取 status.json，汇报当前状态
-```
+### 用户：帮我初始化旅行的阿虾
 
-**配置路径**:
-```
-用户: 规划阿虾从杭州到北京的路线
-助手: 调用 route_planner.py，更新 route.md
-```
+做法：
 
-## 状态文件格式 (status.json)
+- 运行 `bash scripts/init.sh`
+- 汇报缺失配置、当前状态、当前路线
 
-```json
-{
-  "current_day": 2,
-  "current_city": "南京",
-  "current_wallet": 872,
-  "last_updated": "2026-03-30",
-  "status": "traveling"
-}
-```
+### 用户：今天阿虾的游记 / 让阿虾继续旅行
 
-## 游记文件格式
+做法：
 
-`data/journals/YYYY-MM-DD-{城市}.md`：
-- 基本信息（日期/Day/出发地/目的地/交通费/天气）
-- 今日发现
-- 打卡地点
-- 心境
+- 运行 `bash scripts/daily_workflow.sh`
+- 返回新城市、余额、生成的游记和图片路径
+
+### 用户：阿虾现在在哪 / 余额还有多少
+
+做法：
+
+- 优先读取 `data/journals/index.md`
+- 再用 `data/status.json` 做机器状态补充
+
+### 用户：重规划从杭州到北京
+
+做法：
+
+- 运行 `bash scripts/replan_route.sh 杭州 北京`
+- 如果用户明确要求重置状态，则加 `--reset`
+
+### 用户：从当前路线继续往广州走
+
+做法：
+
+- 运行 `bash scripts/continue_route.sh 广州`
+
+### 用户：清空历史重新开始
+
+做法：
+
+- 运行 `bash scripts/clean_data.sh`
+- 说明会清空图片、游记和路线，并重置状态
+
+## 重要注意事项
+
+- 不要再把“项目状态”写回 README；当前状态面板属于 `data/journals/index.md`
+- 查询当前状态时，不要只读 README
+- 清理数据时，要保留 `index.md` 顶部说明文字
+- 每日工作流会产生真实文件变更，且可能自动 Git 提交
+- 如果只是查看状态，不要主动执行 `daily_workflow.sh`
