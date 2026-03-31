@@ -225,8 +225,14 @@ ROUTE_JSON=$(python3 "$TOOLS_PATH/route.py" "$CURRENT_CITY" "$NEXT_CITY" 2>&1) |
 echo "$ROUTE_JSON" > "$PROJECT_ROOT/data/output/route_${TARGET_DATE}.json"
 
 PRICE=$(echo "$ROUTE_JSON" | jq -r '.best_price // 0' 2>/dev/null)
-if [[ "$PRICE" == "null" || -z "$PRICE" ]]; then
-  PRICE=0
+if [[ "$PRICE" == "null" || -z "$PRICE" || "$PRICE" == "0" ]]; then
+  # 如果公共交通价格为0或空，尝试使用自驾的费用
+  DRIVING_PRICE=$(echo "$ROUTE_JSON" | jq -r '.driving_routes[0].price_yuan // 0' 2>/dev/null)
+  if [[ "$DRIVING_PRICE" != "null" && -n "$DRIVING_PRICE" && "$DRIVING_PRICE" != "0" ]]; then
+    PRICE=$DRIVING_PRICE
+  else
+    PRICE=0
+  fi
 fi
 echo "  最低价: ${PRICE}元"
 
@@ -398,7 +404,7 @@ WEATHER_DESC_VAL="${WEATHER_DESC:-afternoon}"
 # 导出供模板引擎使用
 export WEATHER_DESC="$WEATHER_DESC_VAL"
 
-export IMAGE_STYLE_CONTENT NEXT_CITY ATTRACTION_1 ATTRACTION_1_DESC WEATHER_DESC_VAL
+export IMAGE_STYLE_CONTENT NEXTCITY="$NEXT_CITY" ATTRACTION1="$ATTRACTION_1" ATTRACTION1DESC="$ATTRACTION_1_DESC" WEATHERDESC="$WEATHER_DESC_VAL"
 IMAGE_PROMPT_PROMPT=$(python3 "$PROJECT_ROOT/scripts/lib/template_renderer.py" < "$IMAGE_PROMPT_TEMPLATE_FILE")
 
 echo "$IMAGE_PROMPT_PROMPT" > "$PROJECT_ROOT/data/output/image_prompt_request_${TARGET_DATE}.txt"
