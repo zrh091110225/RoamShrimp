@@ -95,11 +95,33 @@ DASHSCOPE_API_KEY=your_key
 - [`data/route.md`](./data/route.md)
 - [`data/journals/`](./data/journals/) 下新增一篇游记
 - [`data/images/`](./data/images/) 下新增一张配图
-- README 顶部项目状态区
 - [`data/journals/index.md`](./data/journals/index.md)
 - Git 提交记录
 
 这也是这个项目最直接的体验方式：跑一次脚本，阿虾就会在仓库里留下新的一天。
+
+## Skills 用法
+
+这个仓库自带一个 skill：
+
+- [`skills/tabi-claw/SKILL.md`](./skills/tabi-claw/SKILL.md)
+
+适合这些场景：
+
+- 让阿虾继续旅行，执行一次完整工作流
+- 查看当前状态、当前城市、余额和路线
+- 重新规划路线或从当前终点继续追加路线
+- 初始化、清理或重置项目
+
+如果你在支持 skill 的 Codex / OpenClaw 环境中使用这个仓库，可以直接提这些请求：
+
+- “今天阿虾的游记”
+- “阿虾现在到哪了”
+- “重规划从杭州到北京，并重置状态”
+- “从当前路线继续往广州走”
+- “清空历史重新开始”
+
+这个 skill 会优先把当前状态视图指向 [`data/journals/index.md`](./data/journals/index.md)，并按当前项目里的真实脚本入口执行。
 
 ## 常用命令
 
