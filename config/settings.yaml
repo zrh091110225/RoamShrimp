@@ -1,7 +1,13 @@
 # 基本配置
 
+# 初始钱包余额
 wallet_initial=10000
-current_wallet=10000
+
+# 当前旅行天数
 current_day=1
+
+# 旅程起点城市
 start_city=杭州
+
+# 关联的本地 GitHub 仓库路径
 github_repo=/Users/hymanhai/RoamShrimp

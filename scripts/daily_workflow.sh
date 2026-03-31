@@ -141,16 +141,10 @@ if [[ -f "$STATUS_FILE" ]]; then
   
   # 检查解析是否成功
   if [[ -z "$CURRENT_CITY" || "$CURRENT_CITY" == "null" ]]; then
-    error_warn "status.json 解析失败，使用默认值"
-    CURRENT_CITY="杭州"
-    CURRENT_WALLET=1000
-    CURRENT_DAY=1
+    error_exit "status.json 解析失败，无法获取当前城市等状态信息。请检查文件格式或重新初始化。"
   fi
 else
-  log_info "status.json 不存在，使用默认值"
-  CURRENT_CITY="杭州"
-  CURRENT_WALLET=1000
-  CURRENT_DAY=1
+  error_exit "status.json 不存在。请先运行 bash scripts/init.sh 进行初始化。"
 fi
 echo "  当前: Day $CURRENT_DAY, $CURRENT_CITY, 余额 $CURRENT_WALLET 元"
 
@@ -568,9 +562,10 @@ EOF
 # 更新 README 项目状态部分
 if [[ -f "$PROJECT_ROOT/README.md" ]]; then
   log_info "更新 README.md..."
-  sed -i '' "s/| Day | [0-9]*/| Day | $NEW_DAY/" "$PROJECT_ROOT/README.md" 2>/dev/null || true
-  sed -i '' "s/| 当前城市 |[^|]*/| 当前城市 | $NEXT_CITY /" "$PROJECT_ROOT/README.md" 2>/dev/null || true
-  sed -i '' "s/| 余额 | [-0-9.]* 元/| 余额 | $NEW_WALLET 元/" "$PROJECT_ROOT/README.md" 2>/dev/null || true
+  sed -i '' -E "s/\| Day[[:space:]]+\|.*\|/| Day      | $NEW_DAY       |/" "$PROJECT_ROOT/README.md" 2>/dev/null || true
+  sed -i '' -E "s/\| 当前城市[[:space:]]+\|.*\|/| 当前城市 | $NEXT_CITY       |/" "$PROJECT_ROOT/README.md" 2>/dev/null || true
+  sed -i '' -E "s/\| 余额[[:space:]]+\|.*\|/| 余额     | $NEW_WALLET 元  |/" "$PROJECT_ROOT/README.md" 2>/dev/null || true
+  sed -i '' -E "s/\| 状态[[:space:]]+\|.*\|/| 状态     | 🟢 旅行中   |/" "$PROJECT_ROOT/README.md" 2>/dev/null || true
 fi
 
 # 12. 追加游记索引（index.md）

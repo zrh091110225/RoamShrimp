@@ -66,7 +66,28 @@ else
   if [[ -f "$DATA_DIR/status.json" ]]; then
     cat "$DATA_DIR/status.json"
   else
-    echo "  (首次运行，将从 settings.yaml 初始化)"
+    echo "  (首次运行，正在从 settings.yaml 初始化 status.json ...)"
+    
+    # 从 settings.yaml 读取初始配置
+    INIT_WALLET=$(grep -E "^wallet_initial=" "$CONFIG_DIR/settings.yaml" | cut -d'=' -f2 || echo "10000")
+    INIT_DAY=$(grep -E "^current_day=" "$CONFIG_DIR/settings.yaml" | cut -d'=' -f2 || echo "1")
+    INIT_CITY=$(grep -E "^start_city=" "$CONFIG_DIR/settings.yaml" | cut -d'=' -f2 || echo "杭州")
+    
+    # 确保 data 目录存在
+    mkdir -p "$DATA_DIR"
+    
+    # 生成 status.json
+    cat > "$DATA_DIR/status.json" << EOF
+{
+  "current_day": $INIT_DAY,
+  "current_city": "$INIT_CITY",
+  "current_wallet": $INIT_WALLET,
+  "last_updated": "$(date +%Y-%m-%d)",
+  "status": "ready"
+}
+EOF
+    echo "  ✅ status.json 初始化完成:"
+    cat "$DATA_DIR/status.json"
   fi
   
   echo ""
