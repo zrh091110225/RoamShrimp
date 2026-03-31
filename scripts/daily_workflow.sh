@@ -582,10 +582,11 @@ if [[ -f "$INDEX_FILE" ]]; then
   # 检查是否已有该游记记录（避免重复追加）
   if ! grep -q "\](./${TARGET_DATE}-${NEXT_CITY}.md)" "$INDEX_FILE" 2>/dev/null; then
     # 在分隔线后面插入新行
-    awk -v date="$TARGET_DATE" -v city="$NEXT_CITY" -v price="${PRICE}元" -v wallet="${NEW_WALLET}元" -v file="${TARGET_DATE}-${NEXT_CITY}.md" '
+    CURRENT_TIME=$(date "+%Y-%m-%d %H:%M:%S")
+    awk -v date="$TARGET_DATE" -v city="$NEXT_CITY" -v price="${PRICE}元" -v wallet="${NEW_WALLET}元" -v file="${TARGET_DATE}-${NEXT_CITY}.md" -v add_time="$CURRENT_TIME" '
       /^\| -/ {
         print
-        print "| " date " | " city " | " price " | " wallet " | [查看](./" file ") |"
+        print "| " date " | " city " | " price " | " wallet " | [查看](./" file ") | " add_time " |"
         next
       }
       /\| <br \/>/ { next }
