@@ -11,3 +11,6 @@ data/logs/
 
 # 图片压缩缓存
 .tinypng_cache/
+.gstack/
+
+.gstack/
