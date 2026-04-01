@@ -1,8 +1,8 @@
 {
-  "current_day": 1,
-  "current_city": "杭州",
-  "current_wallet": 10000,
-  "last_updated": "2026-03-31",
+  "current_day": 2,
+  "current_city": "南京",
+  "current_wallet": 9872,
+  "last_updated": "2026-04-01",
   "status": "traveling",
   "last_star_count": 1
 }
