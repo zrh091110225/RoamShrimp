@@ -25,10 +25,39 @@ from lib.settings import load_runtime_settings
 from lib.template_renderer import render_template
 
 
-INDEX_ROW_RE = re.compile(
-    r"^\|\s*(?P<date>\d{4}-\d{2}-\d{2})\s*\|\s*(?P<city>[^|]+?)\s*\|\s*(?P<price>\d+)元\s*\|\s*(?P<wallet>\d+)元\s*\|\s*\[查看\]\(\./(?P<file>[^)]+)\)\s*\|\s*(?P<added>[^|]+?)\s*\|$"
-)
 JOURNAL_FILE_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})-(?P<city>.+)\.md$")
+LINK_RE = re.compile(r"\[查看\]\(\./(?P<file>[^)]+)\)")
+ATTRACTIONS_LINE_RE = re.compile(r"经过的景点：(?P<attractions>.+?)。")
+GENERIC_ATTRACTION_NAMES = {
+    "周边小店",
+    "路边小摊",
+    "当地小店",
+    "街边小店",
+    "周边街景",
+    "城市街景",
+}
+JOURNAL_ATTRACTION_CANDIDATES = [
+    "西湖",
+    "灵隐寺",
+    "雷峰塔",
+    "南京的城墙",
+    "城墙",
+    "青灰色的砖石",
+    "石砖",
+    "街角小店",
+    "路边的长凳",
+    "泉水",
+    "湖水",
+    "湖边的柳树",
+    "湖边",
+    "热茶",
+    "石头",
+    "石桥",
+    "古桥",
+    "运河",
+    "古寺",
+    "古街",
+]
 
 CANVAS_SIZE = (1200, 1800)
 CARD_WIDTH = 430
@@ -84,18 +113,35 @@ def load_json(path: Path) -> Any:
 def parse_journal_index(index_path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for raw_line in read_text(index_path).splitlines():
-        match = INDEX_ROW_RE.match(raw_line.strip())
-        if not match:
+        line = raw_line.strip()
+        if not line.startswith("|"):
             continue
-        item = match.groupdict()
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) not in {6, 7}:
+            continue
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", cells[0]):
+            continue
+        if len(cells) == 7:
+            date, city, attractions, price_text, wallet_text, link_text, added_at = cells
+        else:
+            date, city, price_text, wallet_text, link_text, added_at = cells
+            attractions = ""
+        link_match = LINK_RE.search(link_text)
+        if not link_match:
+            continue
+        price_match = re.match(r"(\d+)元$", price_text)
+        wallet_match = re.match(r"(\d+)元$", wallet_text)
+        if not price_match or not wallet_match:
+            continue
         rows.append(
             {
-                "date": item["date"],
-                "city": item["city"].strip(),
-                "price": int(item["price"]),
-                "wallet": int(item["wallet"]),
-                "file": item["file"].strip(),
-                "added_at": item["added"].strip(),
+                "date": date,
+                "city": city,
+                "attractions": attractions,
+                "price": int(price_match.group(1)),
+                "wallet": int(wallet_match.group(1)),
+                "file": link_match.group("file").strip(),
+                "added_at": added_at,
             }
         )
     return rows
@@ -122,6 +168,33 @@ def clean_journal_content(raw_text: str) -> str:
 def make_excerpt(text: str, limit: int = 88) -> str:
     compact = re.sub(r"\s+", " ", text).strip()
     return compact[:limit] + ("…" if len(compact) > limit else "")
+
+
+def parse_attractions_text(text: str) -> list[str]:
+    return [item.strip() for item in re.split(r"[、,，/]", text) if item.strip()]
+
+
+def parse_attraction_payload(payload: Any) -> list[str]:
+    if not isinstance(payload, list):
+        return []
+    names: list[str] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        landmark = str(item.get("landmark", "")).strip()
+        if landmark and landmark not in names:
+            names.append(landmark)
+    return names
+
+
+def extract_attractions_from_content_prompt(project_root: Path, date: str) -> str:
+    prompt_path = project_root / f"data/output/content_prompt_{date}.txt"
+    if not prompt_path.exists():
+        return ""
+    match = ATTRACTIONS_LINE_RE.search(read_text(prompt_path))
+    if not match:
+        return ""
+    return match.group("attractions").strip()
 
 
 def derive_landmark_from_journal(city: str, journal_text: str) -> str:
@@ -156,6 +229,88 @@ def derive_landmark_from_journal(city: str, journal_text: str) -> str:
                 phrase = match.group(1)
                 return phrase[-8:]
     return city
+
+
+def is_generic_attraction(name: str, city: str) -> bool:
+    value = name.strip()
+    normalized_city = normalize_city_name(city)
+    return value in GENERIC_ATTRACTION_NAMES or value in {f"{city}景点", f"{normalized_city}景点"}
+
+
+def derive_attractions_from_journal(city: str, journal_text: str) -> list[str]:
+    compact = re.sub(r"\s+", "", journal_text)
+    found: list[str] = []
+    for candidate in JOURNAL_ATTRACTION_CANDIDATES:
+        if candidate in compact and candidate not in found:
+            found.append(candidate)
+        if len(found) >= 3:
+            break
+    if found:
+        return found
+    landmark = derive_landmark_from_journal(city, journal_text)
+    return [landmark] if landmark else []
+
+
+def attraction_names_are_reliable(
+    names: list[str],
+    city: str,
+    journal_text: str,
+    trusted_landmarks: list[str],
+) -> bool:
+    if not names:
+        return False
+    compact = re.sub(r"\s+", "", journal_text)
+    trusted = set(trusted_landmarks)
+    for name in names:
+        if is_generic_attraction(name, city):
+            continue
+        if name in compact or name in trusted:
+            return True
+    return False
+
+
+def resolve_attractions(
+    project_root: Path,
+    row: dict[str, Any],
+    journal_text: str,
+    trusted_landmarks: list[str],
+) -> dict[str, Any]:
+    index_text = row.get("attractions", "").strip()
+    prompt_text = extract_attractions_from_content_prompt(project_root, row["date"])
+    candidates: list[tuple[str, list[str], str]] = []
+    if index_text:
+        candidates.append(("index", parse_attractions_text(index_text), index_text))
+    if prompt_text and prompt_text != index_text:
+        candidates.append(("content_prompt", parse_attractions_text(prompt_text), prompt_text))
+    if trusted_landmarks:
+        candidates.append(("attractions_json", trusted_landmarks, "、".join(trusted_landmarks)))
+
+    for source, names, text in candidates:
+        if attraction_names_are_reliable(names, row["city"], journal_text, trusted_landmarks):
+            return {
+                "names": names,
+                "text": text,
+                "source": source,
+                "raw_index_text": index_text,
+            }
+
+    journal_names = derive_attractions_from_journal(row["city"], journal_text)
+    if journal_names:
+        return {
+            "names": journal_names,
+            "text": "、".join(journal_names),
+            "source": "journal",
+            "raw_index_text": index_text,
+        }
+
+    fallback_name = derive_landmark_from_journal(row["city"], journal_text)
+    fallback_names = [fallback_name] if fallback_name else [row["city"]]
+    return {
+        "names": fallback_names,
+        "text": "、".join(fallback_names),
+        "source": "city_fallback",
+        "raw_index_text": index_text,
+    }
 
 
 def pick_focus_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -233,16 +388,12 @@ def load_fact_bundle(project_root: Path, start_date: dt.date, end_date: dt.date)
                     }
                 )
 
-        representative_landmark = ""
         attraction_payload = load_json(attraction_path)
-        if weather_valid and isinstance(attraction_payload, list):
-            for item in attraction_payload:
-                if not isinstance(item, dict):
-                    continue
-                landmark = str(item.get("landmark", "")).strip()
-                if landmark:
-                    representative_landmark = landmark
-                    break
+        trusted_landmarks = parse_attraction_payload(attraction_payload) if weather_valid else []
+        resolved_attractions = resolve_attractions(project_root, row, journal_text, trusted_landmarks)
+        attractions_text = resolved_attractions["text"]
+        attraction_names = resolved_attractions["names"]
+        representative_landmark = attraction_names[0] if attraction_names else ""
         if not representative_landmark:
             representative_landmark = derive_landmark_from_journal(row["city"], journal_text)
         if representative_landmark and representative_landmark != row["city"]:
@@ -259,6 +410,10 @@ def load_fact_bundle(project_root: Path, start_date: dt.date, end_date: dt.date)
             "city": row["city"],
             "transport_cost": row["price"],
             "wallet": row["wallet"],
+            "attractions": attraction_names,
+            "attractions_text": attractions_text,
+            "attractions_source": resolved_attractions["source"],
+            "raw_attractions_text": resolved_attractions["raw_index_text"],
             "journal_file": f"./{row['file']}",
             "journal_path": str(journal_path),
             "summary_path": str(project_root / "data/summaries"),
@@ -391,6 +546,9 @@ def render_summary_prompt(project_root: Path, fact_bundle: dict[str, Any]) -> st
                         "city": entry["city"],
                         "transport_cost": entry["transport_cost"],
                         "wallet": entry["wallet"],
+                        "attractions": entry["attractions"],
+                        "attractions_text": entry["attractions_text"],
+                        "attractions_source": entry["attractions_source"],
                         "landmark": entry["landmark"],
                         "weather": entry["weather"],
                         "excerpt": entry["excerpt"],
@@ -406,6 +564,9 @@ def render_summary_prompt(project_root: Path, fact_bundle: dict[str, Any]) -> st
                 {
                     "date": entry["date"],
                     "city": entry["city"],
+                    "attractions": entry["attractions"],
+                    "attractions_text": entry["attractions_text"],
+                    "attractions_source": entry["attractions_source"],
                     "landmark": entry["landmark"] or "未找到可靠景点数据",
                     "transport_cost": entry["transport_cost"],
                     "route_position": index + 1,
@@ -972,6 +1133,10 @@ def main() -> int:
                 "transport_cost": entry["transport_cost"],
                 "wallet": entry["wallet"],
                 "journal_file": entry["journal_file"],
+                "attractions": entry["attractions"],
+                "attractions_text": entry["attractions_text"],
+                "attractions_source": entry["attractions_source"],
+                "raw_attractions_text": entry["raw_attractions_text"],
                 "landmark": entry["landmark"],
                 "weather": entry["weather"],
             }
