@@ -60,7 +60,8 @@ JOURNAL_ATTRACTION_CANDIDATES = [
     "古街",
 ]
 
-CANVAS_SIZE = (1200, 1800)
+CANVAS_SIZE = (1200, 1600)
+CANVAS_SIZE_LABEL = f"{CANVAS_SIZE[0]}x{CANVAS_SIZE[1]}"
 TOP_MARGIN = 270
 BOTTOM_MARGIN = 230
 LINE_COLOR = (183, 92, 78, 255)
@@ -903,7 +904,7 @@ def generate_single_pass_poster(
     append_log(log_path, f"阶段海报模式: single_pass")
     append_log(log_path, f"阶段海报图片配置: provider={image_provider}, model={image_model}, script={image_script}")
     append_log(log_path, f"单次生成约束摘要: {constraints.replace(chr(10), ' | ').strip()}")
-    print_console_image_request("阶段海报单次生成", image_provider, image_model, "1200x1800", read_text(prompt_file))
+    print_console_image_request("阶段海报单次生成", image_provider, image_model, CANVAS_SIZE_LABEL, read_text(prompt_file))
     if not shutil_which("bun"):
         append_log(log_path, "未找到 bun，跳过阶段海报单次生成。")
         if poster_path.exists():
@@ -940,7 +941,7 @@ def generate_single_pass_poster(
             "--image",
             str(temp_output),
             "--size",
-            "1200x1800",
+            CANVAS_SIZE_LABEL,
             "--json",
         ]
         with image_log_path.open("a", encoding="utf-8") as handle:
