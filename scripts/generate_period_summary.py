@@ -29,6 +29,7 @@ from lib.template_renderer import render_template
 JOURNAL_FILE_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})-(?P<city>.+)\.md$")
 LINK_RE = re.compile(r"\[查看\]\(\./(?P<file>[^)]+)\)")
 ATTRACTIONS_LINE_RE = re.compile(r"经过的景点：(?P<attractions>.+?)。")
+AMOUNT_RE = re.compile(r"(-?\d+(?:\.\d+)?)元$")
 GENERIC_ATTRACTION_NAMES = {
     "周边小店",
     "路边小摊",
@@ -95,6 +96,25 @@ def iter_date_range(start_date: dt.date, end_date: dt.date) -> list[dt.date]:
     return [start_date + dt.timedelta(days=offset) for offset in range(total_days + 1)]
 
 
+def parse_amount(value: str) -> float | None:
+    match = AMOUNT_RE.match(value.strip())
+    if not match:
+        return None
+    return float(match.group(1))
+
+
+def format_amount(value: Any) -> str:
+    amount = float(value)
+    rounded = round(amount)
+    if math.isclose(amount, rounded, abs_tol=1e-9):
+        return str(int(rounded))
+    return f"{amount:.2f}".rstrip("0").rstrip(".")
+
+
+def format_amount_with_unit(value: Any) -> str:
+    return f"{format_amount(value)} 元"
+
+
 def read_text(path: Path, default: str = "") -> str:
     if not path.exists():
         return default
@@ -134,17 +154,17 @@ def parse_journal_index(index_path: Path) -> list[dict[str, Any]]:
         link_match = LINK_RE.search(link_text)
         if not link_match:
             continue
-        price_match = re.match(r"(\d+)元$", price_text)
-        wallet_match = re.match(r"(\d+)元$", wallet_text)
-        if not price_match or not wallet_match:
+        price_value = parse_amount(price_text)
+        wallet_value = parse_amount(wallet_text)
+        if price_value is None or wallet_value is None:
             continue
         rows.append(
             {
                 "date": date,
                 "city": city,
                 "attractions": attractions,
-                "price": int(price_match.group(1)),
-                "wallet": int(wallet_match.group(1)),
+                "price": price_value,
+                "wallet": wallet_value,
                 "file": link_match.group("file").strip(),
                 "added_at": added_at,
             }
@@ -164,7 +184,7 @@ def clean_journal_content(raw_text: str) -> str:
             continue
         if re.match(r"^[\u4e00-\u9fffA-Za-z·\s（）()]+[（(]\d{4}-\d{2}-\d{2}[）)]$", stripped):
             continue
-        if re.match(r"^交通费：\d+元$", stripped):
+        if re.match(r"^交通费：\d+(?:\.\d+)?元$", stripped):
             continue
         cleaned.append(line)
     return "\n".join(cleaned).strip()
@@ -630,8 +650,7 @@ def build_fallback_summary(fact_bundle: dict[str, Any]) -> dict[str, Any]:
     first_city = fact_bundle["entries"][0]["city"]
     last_city = fact_bundle["entries"][-1]["city"]
     route_count = fact_bundle["city_count"]
-    total_cost = fact_bundle["total_transport_cost"]
-    wallet_delta = fact_bundle["wallet_delta"]
+    total_cost = format_amount(fact_bundle["total_transport_cost"])
     title = f"从{first_city}到{last_city}，这段路慢慢有了形状"
     hook = f"{fact_bundle['start_date']} 到 {fact_bundle['end_date']}，阿虾一共走过 {route_count} 座城，路费花掉 {total_cost} 元，脚步更轻，心也更慢了一点。"
     overview = (
@@ -657,7 +676,7 @@ def build_fallback_summary(fact_bundle: dict[str, Any]) -> dict[str, Any]:
 
     cost_observation = (
         f"这一段真正花钱的地方，不在热闹的景点里，而在城市之间的移动。"
-        f"总交通费是 {total_cost} 元，余额从 {fact_bundle['start_wallet']} 元走到 {fact_bundle['end_wallet']} 元。"
+        f"总交通费是 {total_cost} 元，余额从 {format_amount(fact_bundle['start_wallet'])} 元走到 {format_amount(fact_bundle['end_wallet'])} 元。"
         f"钱像是在替这段旅程丈量距离，每少一点，脚下的路也更具体一点。"
     )
     closing = "回头看这一段，记住的不是打卡数量，而是风、石阶、水面、车程和停顿慢慢叠在一起的质感。"
@@ -783,7 +802,7 @@ def build_transition_lines(fact_bundle: dict[str, Any]) -> str:
 def build_image_constraint_summary(summary_copy: dict[str, Any], fact_bundle: dict[str, Any]) -> str:
     lines = [
         f"标题气质：{summary_copy['title']}",
-        f"事实链路：{fact_bundle['start_date']} 至 {fact_bundle['end_date']}，{fact_bundle['route_chain_text']}，总交通费 {fact_bundle['total_transport_cost']} 元。",
+        f"事实链路：{fact_bundle['start_date']} 至 {fact_bundle['end_date']}，{fact_bundle['route_chain_text']}，总交通费 {format_amount(fact_bundle['total_transport_cost'])} 元。",
         "控制重点：构图骨架、路线流动感、城市顺序的空间分布、各城市代表意象。",
         "硬性约束：不是地图、不是 UI、不是旅游宣传页、不要中轴时间线、不要硬卡片、不要整齐标签、不要明显文字。",
         "文字策略：允许极少量装饰性文字，但不能依赖图中文字承载事实，出现大段文字或乱码视为失败倾向。",
@@ -823,7 +842,7 @@ def generate_image_prompt(
         "CITYLANDMARKLINES": "\n".join(f"{index + 1}. {entry['city']} - {entry['landmark'] or entry['city']}" for index, entry in enumerate(fact_bundle["entries"])),
         "SCENEANCHORLINES": build_scene_anchor_lines(fact_bundle),
         "TRANSITIONLINES": build_transition_lines(fact_bundle),
-        "FACTLINE": f"{fact_bundle['start_date']} 至 {fact_bundle['end_date']}，{fact_bundle['route_chain_text']}，总交通费 {fact_bundle['total_transport_cost']} 元。",
+        "FACTLINE": f"{fact_bundle['start_date']} 至 {fact_bundle['end_date']}，{fact_bundle['route_chain_text']}，总交通费 {format_amount(fact_bundle['total_transport_cost'])} 元。",
     }
     request_prompt = render_template_file(project_root / "config/summary_image_prompt.md", prompt_context)
     write_text(output_dir / "image_prompt_request.txt", request_prompt)
@@ -1241,7 +1260,7 @@ def render_poster(
     for index, (entry, anchor) in enumerate(zip(entries, anchors)):
         draw_city_label(draw, anchor, entry, index, len(entries), date_font, city_font, landmark_font, badge_font)
 
-    footer = f"{fact_bundle['route_chain_text']}  |  总交通费 {fact_bundle['total_transport_cost']} 元"
+    footer = f"{fact_bundle['route_chain_text']}  |  总交通费 {format_amount(fact_bundle['total_transport_cost'])} 元"
     draw.rounded_rectangle((146, CANVAS_SIZE[1] - 112, CANVAS_SIZE[0] - 146, CANVAS_SIZE[1] - 60), radius=24, fill=(250, 245, 238, 186), outline=(214, 196, 183, 86), width=1)
     draw_centered_text(draw, CANVAS_SIZE[0] // 2, CANVAS_SIZE[1] - 96, footer, meta_font, (102, 76, 64, 240))
 
@@ -1249,8 +1268,11 @@ def render_poster(
     canvas.save(output_path)
 
 
-def format_wallet_delta(value: int) -> str:
-    return f"{value:+d} 元"
+def format_wallet_delta(value: Any) -> str:
+    amount = format_amount(value)
+    if not amount.startswith("-"):
+        amount = f"+{amount}"
+    return f"{amount} 元"
 
 
 def build_summary_markdown(summary_copy: dict[str, Any], fact_bundle: dict[str, Any], file_name: str, include_image: bool) -> str:
@@ -1258,7 +1280,7 @@ def build_summary_markdown(summary_copy: dict[str, Any], fact_bundle: dict[str, 
     snapshot = [
         ("经过城市数", f"{fact_bundle['city_count']} 座"),
         ("代表景点数", f"{fact_bundle['representative_landmark_count']} 个"),
-        ("总交通费", f"{fact_bundle['total_transport_cost']} 元"),
+        ("总交通费", format_amount_with_unit(fact_bundle["total_transport_cost"])),
         ("余额变化", format_wallet_delta(fact_bundle["wallet_delta"])),
     ]
     snapshot_lines = ["| 指标 | 数值 |", "| ---- | ---- |"]
@@ -1266,7 +1288,7 @@ def build_summary_markdown(summary_copy: dict[str, Any], fact_bundle: dict[str, 
 
     cost_lines = ["| 日期 | 城市 | 交通费 | 当日余额 |", "| ---- | ---- | ---- | ---- |"]
     cost_lines.extend(
-        f"| {entry['date']} | {entry['city']} | {entry['transport_cost']} 元 | {entry['wallet']} 元 |"
+        f"| {entry['date']} | {entry['city']} | {format_amount(entry['transport_cost'])} 元 | {format_amount(entry['wallet'])} 元 |"
         for entry in fact_bundle["entries"]
     )
 
@@ -1281,14 +1303,14 @@ def build_summary_markdown(summary_copy: dict[str, Any], fact_bundle: dict[str, 
             [
                 f"![阶段路线海报]({image_rel})",
                 "",
-                f"_这张海报是阶段旅程主视觉，准确事实以本文内容为准。{fact_bundle['start_date']} 至 {fact_bundle['end_date']} · {fact_bundle['route_chain_text']} · 总交通费 {fact_bundle['total_transport_cost']} 元。_",
+                f"_这张海报是阶段旅程主视觉，准确事实以本文内容为准。{fact_bundle['start_date']} 至 {fact_bundle['end_date']} · {fact_bundle['route_chain_text']} · 总交通费 {format_amount(fact_bundle['total_transport_cost'])} 元。_",
                 "",
             ]
         )
     else:
         markdown.extend(
             [
-                f"_本次未生成新的阶段海报，准确事实如下：{fact_bundle['start_date']} 至 {fact_bundle['end_date']} · {fact_bundle['route_chain_text']} · 总交通费 {fact_bundle['total_transport_cost']} 元。_",
+                f"_本次未生成新的阶段海报，准确事实如下：{fact_bundle['start_date']} 至 {fact_bundle['end_date']} · {fact_bundle['route_chain_text']} · 总交通费 {format_amount(fact_bundle['total_transport_cost'])} 元。_",
                 "",
             ]
         )
@@ -1354,7 +1376,7 @@ def update_summary_index(project_root: Path, fact_bundle: dict[str, Any], summar
     route_short = fact_bundle["route_chain_text"]
     row = (
         f"| {label} | {fact_bundle['days_covered']}天 | {route_short} | "
-        f"{fact_bundle['total_transport_cost']}元 | [查看](../summaries/{summary_path.name}) | {generated_at} |"
+        f"{format_amount(fact_bundle['total_transport_cost'])}元 | [查看](../summaries/{summary_path.name}) | {generated_at} |"
     )
     existing_row_pattern = re.compile(
         rf"^\|\s*{re.escape(label)}\s*\|.*\(\.\./summaries/{re.escape(summary_path.name)}\).*$",
@@ -1427,7 +1449,10 @@ def main() -> int:
     else:
         append_log(run_log_path, "请求日期范围内每天都有游记数据，无需跳过。")
     append_log(run_log_path, f"命中游记 {fact_bundle['days_covered']} 篇，城市链路: {fact_bundle['route_chain_text']}")
-    append_log(run_log_path, f"总交通费 {fact_bundle['total_transport_cost']} 元，余额变化 {fact_bundle['wallet_delta']} 元")
+    append_log(
+        run_log_path,
+        f"总交通费 {format_amount(fact_bundle['total_transport_cost'])} 元，余额变化 {format_wallet_delta(fact_bundle['wallet_delta'])}",
+    )
 
     summary_result = generate_summary_copy(project_root, fact_bundle, settings)
     summary_copy = summary_result["copy"]
