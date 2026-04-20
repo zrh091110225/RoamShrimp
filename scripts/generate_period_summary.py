@@ -90,6 +90,11 @@ def parse_date(value: str) -> dt.date:
     return dt.datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def iter_date_range(start_date: dt.date, end_date: dt.date) -> list[dt.date]:
+    total_days = (end_date - start_date).days
+    return [start_date + dt.timedelta(days=offset) for offset in range(total_days + 1)]
+
+
 def read_text(path: Path, default: str = "") -> str:
     if not path.exists():
         return default
@@ -1412,6 +1417,15 @@ def main() -> int:
         append_log(run_log_path, f"生成失败: {exc}")
         print(str(exc), file=sys.stderr)
         return 1
+    covered_dates = [entry["date"] for entry in fact_bundle["entries"]]
+    requested_dates = [day.isoformat() for day in iter_date_range(start_date, end_date)]
+    missing_dates = [date_text for date_text in requested_dates if date_text not in covered_dates]
+    append_log(run_log_path, f"请求日期范围共 {len(requested_dates)} 天，实际命中 {len(covered_dates)} 天")
+    append_log(run_log_path, f"命中日期: {', '.join(covered_dates)}")
+    if missing_dates:
+        append_log(run_log_path, f"以下日期无游记数据，已跳过: {', '.join(missing_dates)}")
+    else:
+        append_log(run_log_path, "请求日期范围内每天都有游记数据，无需跳过。")
     append_log(run_log_path, f"命中游记 {fact_bundle['days_covered']} 篇，城市链路: {fact_bundle['route_chain_text']}")
     append_log(run_log_path, f"总交通费 {fact_bundle['total_transport_cost']} 元，余额变化 {fact_bundle['wallet_delta']} 元")
 
